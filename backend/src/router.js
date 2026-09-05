@@ -8,6 +8,7 @@ const Account = require('./handler/account');
 const MediaFetcherLib = require('./handler/media_fetcher_lib');
 const Config = require('./handler/config');
 const Scheduler = require('./handler/scheduler');
+const LxSource = require('./handler/lx_source');
 const asyncWrapper = (cb) => {
     return (req, res, next) => cb(req, res, next).catch(next);
   };
@@ -38,5 +39,9 @@ router.post('/api/config/global', asyncWrapper(Config.setGlobalConfig));
 
 router.get('/api/scheduler/next-run', asyncWrapper(Scheduler.getNextRun));
 
+// LX Source Bridge routes
+router.get('/api/lx-source/status', asyncWrapper(LxSource.getStatus));
+router.post('/api/lx-source/reload', asyncWrapper(LxSource.reload));
+router.post('/api/lx-source/resolve', asyncWrapper(LxSource.resolveUrl));
+
 module.exports = router;
- 
