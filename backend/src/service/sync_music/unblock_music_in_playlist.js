@@ -187,6 +187,34 @@ async function syncSingleSongWithMeta(uid, wySongMeta) {
     for (const searchItem of searchListfilttered) {
         logger.info(`try to the search item: ${JSON.stringify(searchItem)}`);
 
+        // Try LX source bridge first
+        let lxSucceed = false;
+        try {
+            const bridge = await getLxBridge();
+            if (bridge) {
+                logger.info(`[unblock-playlist] trying LX source for ${searchItem.songName}`);
+                const lxUrl = await Promise.race([
+                    bridge.resolveUrlFromSearchResult(searchItem),
+                    new Promise(resolve => setTimeout(() => resolve(null), 20000))
+                ]);
+                if (lxUrl) {
+                    logger.info(`[unblock-playlist] LX resolved: ${lxUrl.slice(0, 80)}`);
+                    const dlPath = await downloadViaSourceUrl(lxUrl);
+                    if (dlPath) {
+                        lxSucceed = await uploadWithRetryThenMatch(uid, dlPath, {
+                            songName: searchItem.songName,
+                            artist: searchItem.artist,
+                            album: searchItem.album || '',
+                        }, songFromWyCloud);
+                    }
+                }
+            }
+        } catch (e) {
+            logger.warn(`[unblock-playlist] LX source failed: ${e.message}`);
+        }
+        if (lxSucceed === "IOFailed") { return false; }
+        if (lxSucceed) { return true; }
+
         const isUploadSucceed = await syncSingleSongWithUrl(uid, searchItem.url, {
             songName: wySongMeta.songName,
             artist: wySongMeta.artists[0],
