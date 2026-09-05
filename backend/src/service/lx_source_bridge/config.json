@@ -1,0 +1,46 @@
+{
+  "sources": [
+    {
+      "name": "yecao",
+      "label": "野草源",
+      "file": "/app/backend/.profile/lx-sources/yc.js",
+      "enabled": true,
+      "initTimeout": 15000,
+      "platforms": ["kw"],
+      "qualities": ["128k"],
+      "priority": 1
+    },
+    {
+      "name": "grass",
+      "label": "Grass源(pdone)",
+      "file": "/app/backend/.profile/lx-sources/grass.js",
+      "enabled": true,
+      "initTimeout": 15000,
+      "platforms": ["kw"],
+      "qualities": ["128k"],
+      "priority": 2
+    },
+    {
+      "name": "sixyin",
+      "label": "六音源",
+      "url": "https://cdn.jsdelivr.net/gh/liuyunss/LX-source@master/sixyin-v1.2.1.js",
+      "enabled": false,
+      "initTimeout": 15000,
+      "platforms": [],
+      "qualities": [],
+      "priority": 3
+    },
+    {
+      "name": "yh",
+      "label": "YH源",
+      "url": "https://cdn.jsdelivr.net/gh/liuyunss/LX-source@master/yh.js",
+      "enabled": false,
+      "initTimeout": 15000,
+      "platforms": [],
+      "qualities": [],
+      "priority": 4
+    }
+  ],
+  "globalEnabled": true,
+  "fallbackToMediaGet": true
+}
