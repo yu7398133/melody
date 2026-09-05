@@ -9,8 +9,23 @@ const downloadFile = require('../../utils/download');
 
 const { getBinPath } = require('./media_get');
 
+// LX Source Bridge - lazy loaded
+let lxSourceBridge = null;
+async function getLxBridge() {
+    if (lxSourceBridge === false) return null;
+    if (!lxSourceBridge) {
+        try {
+            lxSourceBridge = require('../lx_source_bridge');
+            await lxSourceBridge.init();
+        } catch (e) {
+            logger.warn('[media_fetcher] LX source bridge not available: ' + e.message);
+            lxSourceBridge = false;
+        }
+    }
+    return lxSourceBridge;
+}
+
 const basePath = path.join(os.tmpdir(), 'melody-tmp-songs');
-// create path if not exists
 if (!fs.existsSync(basePath)) {
     fs.mkdirSync(basePath);
 }
@@ -24,7 +39,6 @@ async function downloadViaSourceUrl(url) {
     const downloadPath = `${basePath}/${requestHash}.mp3`;
     logger.info(`start download from ${url}`);
 
-
     const isSucceed = await downloadFile(url, downloadPath);
     if (!isSucceed) {
         logger.error(`download failed with ${url}`);
@@ -37,6 +51,37 @@ async function downloadViaSourceUrl(url) {
     }
     logger.info(`download success, path: ${downloadPath}`);
     return downloadPath;
+}
+
+// Try to download using LX source bridge first, fall back to direct URL
+async function downloadViaSourceUrlWithLxFallback(searchItem) {
+    const originalUrl = searchItem.url;
+    
+    // Try LX source bridge first
+    try {
+        const bridge = await getLxBridge();
+        if (bridge) {
+            const lxUrl = await Promise.race([
+                bridge.resolveUrlFromSearchResult(searchItem),
+                new Promise(resolve => setTimeout(() => resolve(null), 20000))
+            ]);
+            
+            if (lxUrl) {
+                logger.info(`[media_fetcher] trying LX source URL: ${lxUrl.slice(0, 80)}`);
+                const result = await downloadViaSourceUrl(lxUrl);
+                if (result) {
+                    logger.info('[media_fetcher] LX source download succeeded');
+                    return result;
+                }
+                logger.warn('[media_fetcher] LX source download failed, falling back to original URL');
+            }
+        }
+    } catch (e) {
+        logger.warn('[media_fetcher] LX source bridge error: ' + e.message);
+    }
+    
+    // Fall back to original URL
+    return await downloadViaSourceUrl(originalUrl);
 }
 
 async function fetchWithUrl(url, {
@@ -56,7 +101,7 @@ async function fetchWithUrl(url, {
         return false;
     }
 
-    addMediaTag = false; // todo: 等到 media-get fix 偶现的 添加 addMediaTag 后 panic 的问题，再移除这行代码
+    addMediaTag = false;
     const downloadPath = `${fileBasePath}/${songName ? songName : requestHash}.mp3`;
     logger.info(`start parse and download from ${url}`);
 
@@ -82,25 +127,18 @@ async function fetchWithUrl(url, {
 async function getMetaWithUrl(url) {
     logger.info(`getMetaWithUrl from ${url}`);
 
-    let args = ['-u', `"${url}"`, '-m', '--infoFormat=json', '-l=silence'];
+    let args = ['-u', `"${url}"`, '-m', '--infoFormat=json'];
 
     const {code, message} = await cmd(getBinPath(), args);
     logger.info('-------')
     logger.info(code);
-    // logger.info(message);
     logger.info('-------')
     if (code != 0) {
         logger.error(`getMetaWithUrl failed with ${url}, err: ${message}`);
         return false;
     }
 
-    let meta;
-    try {
-        meta = JSON.parse(message);
-    } catch (e) {
-        logger.error(e, message)
-        return false;
-    }
+    const meta = JSON.parse(message);
 
     return {
         songName: meta.title,
@@ -118,6 +156,7 @@ async function getMetaWithUrl(url) {
     }
 }
 
+// Search songs - NO LX enhancement here, returns fast
 async function searchSongFromAllPlatform({
     keyword,
     songName, artist, album
@@ -142,10 +181,9 @@ async function searchSongFromAllPlatform({
     const {code, message} = await cmd(getBinPath(), searchParams);
     logger.info('-------')
     logger.info(code);
-    // logger.info(message);
     logger.info('-------')
     if (code != 0) {
-        logger.error(`searchSong failed with ${arguments}, err: ${message}`);
+        logger.error(`searchSong failed, err: ${message}`);
         return false;
     }
 
@@ -153,7 +191,7 @@ async function searchSongFromAllPlatform({
     try {
         jsonResponse = JSON.parse(message);
     } catch (e) {
-        logger.error(e, message)
+        logger.error(e)
         return false;
     }
 
@@ -174,7 +212,9 @@ async function searchSongFromAllPlatform({
 
 module.exports = {
     downloadViaSourceUrl: downloadViaSourceUrl,
+    downloadViaSourceUrlWithLxFallback: downloadViaSourceUrlWithLxFallback,
     fetchWithUrl: fetchWithUrl,
     getMetaWithUrl: getMetaWithUrl,
     searchSongFromAllPlatform: searchSongFromAllPlatform,
+    getLxBridge: getLxBridge,
 }
