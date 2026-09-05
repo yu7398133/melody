@@ -6,6 +6,8 @@ const JobManager = require('../job_manager');
 const JobType = require('../../consts/job_type');
 const JobStatus = require('../../consts/job_status');
 const BusinessCode = require('../../consts/business_code');
+const { getLxBridge, downloadViaSourceUrl } = require('../media_fetcher');
+const uploadWithRetryThenMatch = require('./upload_to_wycloud_disk_with_retry_then_match');
 
 module.exports = async function unblockMusiWithSongId(uid, source, songId) {
     const songInfo = await getSongInfo(uid, songId);
@@ -84,6 +86,47 @@ async function syncSingleSongWithMeta(uid, wySongMeta) {
     for (const searchItem of searchListfilttered) {
         logger.info(`try to the search item: ${JSON.stringify(searchItem)}`);
 
+        // Step 1: Try LX source bridge first (direct download URL)
+        let lxDownloaded = false;
+        try {
+            const bridge = await getLxBridge();
+            if (bridge) {
+                logger.info(`[unblock] trying LX source for ${searchItem.songName} (${searchItem.source})`);
+                const lxUrl = await Promise.race([
+                    bridge.resolveUrlFromSearchResult(searchItem),
+                    new Promise(resolve => setTimeout(() => resolve(null), 20000))
+                ]);
+                
+                if (lxUrl) {
+                    logger.info(`[unblock] LX source resolved URL: ${lxUrl.slice(0, 80)}`);
+                    const downloadPath = await downloadViaSourceUrl(lxUrl);
+                    if (downloadPath) {
+                        logger.info(`[unblock] LX source download success, uploading...`);
+                        // Upload to cloud disk
+                        const songInfo = {
+                            songName: searchItem.songName,
+                            artist: searchItem.artist,
+                            album: searchItem.album || '',
+                        };
+                        lxDownloaded = await uploadWithRetryThenMatch(uid, downloadPath, songInfo, songFromWyCloud);
+                    }
+                }
+            }
+        } catch (e) {
+            logger.warn(`[unblock] LX source attempt failed: ${e.message}`);
+        }
+
+        // If LX source succeeded, skip to next
+        if (lxDownloaded === "IOFailed") {
+            logger.error(`[unblock] upload failed after LX download, not trying others.`);
+            return false;
+        }
+        if (lxDownloaded) {
+            logger.info(`[unblock] song unblocked via LX source!`);
+            return true;
+        }
+
+        // Step 2: Fall back to normal media-get download
         const isUploadSucceed = await syncSingleSongWithUrl(uid, searchItem.url, {
             songName: wySongMeta.songName,
             artist: wySongMeta.artists[0],
