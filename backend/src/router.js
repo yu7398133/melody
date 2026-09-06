@@ -43,5 +43,6 @@ router.get('/api/scheduler/next-run', asyncWrapper(Scheduler.getNextRun));
 router.get('/api/lx-source/status', asyncWrapper(LxSource.getStatus));
 router.post('/api/lx-source/reload', asyncWrapper(LxSource.reload));
 router.post('/api/lx-source/resolve', asyncWrapper(LxSource.resolveUrl));
+router.get('/api/lx-source/check', asyncWrapper(LxSource.checkUrl));
 
 module.exports = router;
