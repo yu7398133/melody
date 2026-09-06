@@ -3,3 +3,8 @@
 .el-dialog__body{max-height:72vh;overflow-y:auto}
 .el-dialog{overflow:hidden}
 .search-result-table[data-v-aae01dfc]{overflow-x:auto!important}
+
+.lx-badge{display:inline-block;font-size:11px;line-height:1.6;padding:1px 7px;margin-left:6px;border-radius:8px;font-weight:600;vertical-align:middle;white-space:nowrap}
+.lx-badge-pending{color:#909399;background:#f0f2f5}
+.lx-badge-yes{color:#fff;background:#67c23a}
+.lx-badge-no{color:#b1b3b8;background:#f0f2f5}
