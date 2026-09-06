@@ -2,4 +2,4 @@
 
 .el-dialog__body{max-height:72vh;overflow-y:auto}
 .el-dialog{overflow:hidden}
-.search-result-table{overflow-x:auto}
+.search-result-table[data-v-aae01dfc]{overflow-x:auto!important}
