@@ -1,0 +1,5 @@
+.search-result-table[data-v-aae01dfc]{margin-top:20px;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px #0000000d}.song-name-cell[data-v-aae01dfc]{display:flex;align-items:center;padding-left:10px}.lock-icon[data-v-aae01dfc]{font-size:16px;color:#909399;margin-right:8px}.song-name[data-v-aae01dfc]{font-size:14px;color:#303133}.operation-cell[data-v-aae01dfc]{position:relative;height:100%}.operation-buttons[data-v-aae01dfc]{display:flex;justify-content:center;gap:8px;opacity:1;transition:opacity .3s ease;position:relative;z-index:200}[data-v-aae01dfc] .el-table__row:hover .operation-buttons,.operation-buttons[data-v-aae01dfc]:hover{opacity:1}.operation-btn[data-v-aae01dfc]{padding:6px;font-size:16px;background-color:var(--el-button-bg-color)}[data-v-aae01dfc] .el-table__header,[data-v-aae01dfc] .el-table__body,[data-v-aae01dfc] .el-table__header-wrapper,[data-v-aae01dfc] .el-table__body-wrapper{width:100%!important}
+
+.el-dialog__body{max-height:72vh;overflow-y:auto}
+.el-dialog{overflow:hidden}
+.search-result-table{overflow-x:auto}
