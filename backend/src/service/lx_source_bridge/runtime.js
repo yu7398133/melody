@@ -7,6 +7,7 @@ const logger = require('consola');
 // LX Music event names - must match LX Music Desktop's actual EVENT_NAMES
 const EVENT_NAMES = {
   inited: 'inited',
+  request: 'request',
   requestMusicUrl: 'musicUrl',
   requestSearch: 'search',
   updateAlert: 'updateAlert',
@@ -39,7 +40,13 @@ function httpRequest(url, options, callback) {
     res.on('data', (chunk) => { body += chunk; });
     res.on('end', () => {
       try {
-        callback(null, { statusCode: res.statusCode, body: body, headers: res.headers });
+        var parsedBody = body;
+      try {
+        if (body && (body.charAt(0) === '{' || body.charAt(0) === '[')) {
+          parsedBody = JSON.parse(body);
+        }
+      } catch(e) {}
+      callback(null, { statusCode: res.statusCode, body: parsedBody, headers: res.headers });
       } catch(callbackErr) {
         logger.error('[lx-runtime] request callback error: ' + callbackErr.message);
       }
@@ -170,6 +177,8 @@ function createLxRuntime(scriptCode, scriptVersion) {
         var args = Array.prototype.slice.call(arguments);
         logger.warn('[lx-script] ' + args.join(' '));
       },
+      group: function() {},
+      groupEnd: function() {},
       info: function() {
         var args = Array.prototype.slice.call(arguments);
         logger.info('[lx-script] ' + args.join(' '));
