@@ -135,12 +135,62 @@ async function getMetaWithUrl(url) {
     logger.info('-------')
     if (code != 0) {
         logger.error(`getMetaWithUrl failed with ${url}, err: ${message}`);
+        // LX source fallback when media-get fails
+        try {
+            const bridge = await getLxBridge();
+            if (bridge) {
+                // Try to detect source from URL
+                const sources = bridge.SOURCE_MAP;
+                let detectedSource = null;
+                for (const [mgSource, lxCode] of Object.entries(sources)) {
+                    if (url.includes(mgSource) || (mgSource === 'kuwo' && url.includes('kuwo')) ||
+                        (mgSource === 'netease' && url.includes('163.com')) ||
+                        (mgSource === 'qq' && url.includes('qq.com')) ||
+                        (mgSource === 'kugou' && url.includes('kugou')) ||
+                        (mgSource === 'migu' && url.includes('migu'))) {
+                        detectedSource = mgSource;
+                        break;
+                    }
+                }
+                if (detectedSource) {
+                    logger.info('[media_fetcher] media-get failed, trying LX fallback for ' + detectedSource);
+                    const lxUrl = await Promise.race([
+                        bridge.resolveUrlFromSearchResult({
+                            source: detectedSource,
+                            url: url,
+                            songName: '',
+                            artist: '',
+                        }),
+                        new Promise(resolve => setTimeout(() => resolve(null), 8000))
+                    ]);
+                    if (lxUrl) {
+                        logger.info('[media_fetcher] LX fallback resolved URL: ' + lxUrl.slice(0, 80));
+                        return {
+                            songName: '',
+                            artist: '',
+                            album: '',
+                            duration: 0,
+                            coverUrl: '',
+                            publicTime: '',
+                            isTrial: false,
+                            resourceType: 'audio',
+                            audios: [{ url: lxUrl, type: 'lx-source', quality: '128k' }],
+                            fromMusicPlatform: true,
+                            resourceForbidden: false,
+                            source: detectedSource,
+                        };
+                    }
+                }
+            }
+        } catch (e) {
+            logger.warn('[media_fetcher] LX fallback failed: ' + e.message);
+        }
         return false;
     }
 
     const meta = JSON.parse(message);
 
-    return {
+    const result = {
         songName: meta.title,
         artist: meta.artist,
         album: meta.album,
@@ -153,7 +203,38 @@ async function getMetaWithUrl(url) {
         fromMusicPlatform: meta.from_music_platform,
         resourceForbidden: meta.resource_forbidden,
         source: meta.source
+    };
+
+    // Try LX source enhancement for preview
+    try {
+        const bridge = await getLxBridge();
+        if (bridge && meta.source) {
+            const lxSourceCode = bridge.SOURCE_MAP[meta.source];
+            if (lxSourceCode) {
+                logger.info('[media_fetcher] trying LX source for meta: ' + meta.source + ' ' + (meta.title || ''));
+                const lxUrl = await Promise.race([
+                    bridge.resolveUrlFromSearchResult({
+                        source: meta.source,
+                        url: url,
+                        songName: meta.title,
+                        artist: meta.artist,
+                    }),
+                    new Promise(resolve => setTimeout(() => resolve(null), 8000))
+                ]);
+                if (lxUrl) {
+                    if (!result.audios) result.audios = [];
+                    result.audios.unshift({ url: lxUrl, type: 'lx-source', quality: '128k' });
+                    result.isTrial = false;
+                    result.resourceForbidden = false;
+                    logger.info('[media_fetcher] LX enhanced meta with direct URL for ' + (meta.title || ''));
+                }
+            }
+        }
+    } catch (e) {
+        logger.warn('[media_fetcher] LX meta enhancement failed: ' + e.message);
     }
+
+    return result;
 }
 
 // Search songs - NO LX enhancement here, returns fast
@@ -195,19 +276,24 @@ async function searchSongFromAllPlatform({
         return false;
     }
 
-    return jsonResponse.map(searchItem => {
+    let results = jsonResponse.map(searchItem => {
         return {
             songName: searchItem.Name,
             artist: searchItem.Artist,
             album: searchItem.Album,
             duration: searchItem.Duration,
             url: searchItem.Url,
+            sourceUrl: searchItem.Url,
             resourceForbidden: searchItem.ResourceForbidden,
             source: searchItem.Source,
             fromMusicPlatform: searchItem.FromMusicPlatform,
             score: searchItem.Score,
         }
     })
+
+    // Note: LX source resolution happens in getMetaWithUrl (single request per preview)
+    // to avoid triggering API rate limits from batch requests
+    return results;
 }
 
 module.exports = {
